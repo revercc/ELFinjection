@@ -14,11 +14,15 @@
 
             "request": "launch",
 
-            "args": [],
+            "args": [
+                "-p",
+                "19056",
+                "/data/local/tmp/libtest.so"
+            ],
 
             "cwd": "${workspaceRoot}",
 
-            "program": "${workspaceRoot}/obj/local/armeabi-v7a/elfprocess",           //目标调试程序（带符号）
+            "program": "${workspaceRoot}/obj/local/armeabi-v7a/ELFinjection",           //目标调试程序（带符号）
 
             "additionalSOLibSearchPath": "${workspaceRoot}/bin/armeabi-v7a",  //目标调试库（带符号）
 
