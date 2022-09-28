@@ -2,6 +2,7 @@
 
 #include <unistd.h>
 #define MAX_PARAMENUM   10
+#define MAX_PROCNAME    100
 extern char g_libc_path[PATH_MAX];
 extern char g_linker_path[PATH_MAX];
 

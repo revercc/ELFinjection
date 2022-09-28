@@ -25,8 +25,9 @@ void* get_module_base(pid_t pid, const char *module_name)
         char file_data[1024] = {0};
         while(fgets(file_data, 1024, fd)){
             if(strstr(file_data, module_name)){
-                char *addr = strtok(file_data, '-');
-                module_base = strtoul(addr, NULL, 16);
+                u_long index = strchr(file_data, '-');
+                file_data[index - (u_long)file_data] = 0;
+                module_base = strtoul(file_data, NULL, 16);
                 break;
             }
         }
@@ -83,31 +84,31 @@ int ptrace_init(pid_t remote_pid)
 
 
 //read remote process's data of size
-int ptrace_readdata(pid_t pid, uint8_t *source, uint8_t *dest, size_t size)
+int ptrace_readdata(pid_t pid, uint8_t *dest, uint8_t *source, size_t size)
 {
     if(0 == pid || NULL == source || NULL == dest)  return -1;
 
     int ret = 0;
     int word = __WORDSIZE / 8;
     for(int i = 0; i < size / word; i++){
-        if(ptrace(PTRACE_PEEKDATA, pid, dest + i * word, source + i * word))    return -1;
+        if(ptrace(PTRACE_PEEKDATA, pid, source + i * word, dest + i * word))    return -1;
     }
-    ret = ptrace(PTRACE_POKEDATA, pid, dest + size - word - 1, source + size - word - 1);
+    ret = ptrace(PTRACE_POKEDATA, pid, source + size - word, dest + size - word);
     return ret;
 }
 
 
 //write remote process's data of size
-int ptrace_writedata(pid_t pid, uint8_t *source, uint8_t *dest, size_t size)
+int ptrace_writedata(pid_t pid, uint8_t *dest, uint8_t *source, size_t size)
 {
     if(0 == pid || NULL == source || NULL == dest)  return -1;
 
     int ret = 0;
     int word = __WORDSIZE / 8;
     for(int i = 0; i < size / word; i++){
-        if(ptrace(PTRACE_POKEDATA, pid, dest + i * word, source + i * word))    return -1;
+        if(ptrace(PTRACE_POKEDATA, pid, dest + i * word, *(u_long*)(source + i * word)))    return -1;
     }
-    ret = ptrace(PTRACE_POKEDATA, pid, dest + size - word - 1, source + size - word - 1);
+    ret = ptrace(PTRACE_POKEDATA, pid, dest + size - word, *(u_long*)(source + size - word));
     return ret;
 }
 
@@ -116,7 +117,7 @@ int ptrace_writedata(pid_t pid, uint8_t *source, uint8_t *dest, size_t size)
 #ifdef  __arm__
 int ptrace_call(pid_t pid, void *remote_proc, const u_long *parameters, int param_num, struct pt_regs* regs, u_long* remote_proc_ret)
 {
-    if(0 == pid || NULL == remote_proc || param_num >= 0 || NULL == regs) return -1;
+    if(0 == pid || NULL == remote_proc  || NULL == regs || NULL == remote_proc_ret) return -1;
 
     int ret = 0;
     if(param_num <= 4){
@@ -175,7 +176,7 @@ int ptrace_call(pid_t pid, void *remote_proc )
 #endif
 
 //injection remote process
-int inject_remote_process(pid_t pid, const char *lib_path)
+int inject_remote_process(pid_t pid, const char *lib_path, void * remote_module_base)
 {
     if(0 == pid || NULL == lib_path)    return -1;
 
@@ -216,7 +217,7 @@ int inject_remote_process(pid_t pid, const char *lib_path)
     void *inject_module_base = NULL;
     parameters[0] = remote_map_addr;            //file_name
     parameters[1] = RTLD_NOW | RTLD_GLOBAL;     //flags
-    ret = ptrace_call(pid, remote_dlopen, parameters, 1, &new_regs, &inject_module_base);
+    ret = ptrace_call(pid, remote_dlopen, parameters, 2, &new_regs, &inject_module_base);
     if(ret || !inject_module_base){
         return -1;
     }
@@ -236,8 +237,12 @@ int inject_remote_process(pid_t pid, const char *lib_path)
     if(ptrace(PTRACE_DETACH, pid, NULL, NULL)){
         return -1;
     }
+
+    *(u_long*)remote_module_base = inject_module_base;
     return 0;
 }
+
+
 
 //call remote module's func
 int call_remote_module_func(

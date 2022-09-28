@@ -16,7 +16,7 @@ int ptrace_writedata(pid_t pid, uint8_t *source, uint8_t *dest, size_t size);
 
 
 //injection remote process
-int inject_remote_process(pid_t pid, const char *lib_path);
+int inject_remote_process(pid_t pid, const char *lib_path, void * remote_module_base);
 //call remote module's func
 int call_remote_module_func(
     pid_t pid, 

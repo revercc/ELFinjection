@@ -4,7 +4,7 @@
             "name": "arm",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${env:ANDROID_NDK}/sysroot/usr/include/arm-linux-androideabi",
+                "${env:ANDROID_NDK}/sysroot/usr/include/arm-linux-androideabi/",
                 "${env:ANDROID_NDK}/sysroot/usr/include"
             ],
             "defines":  [

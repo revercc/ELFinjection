@@ -16,8 +16,9 @@
 
             "args": [
                 "-p",
-                "19056",
-                "/data/local/tmp/libtest.so"
+                "12961",
+                "/data/local/tmp/libtest.so",
+                "message_test"
             ],
 
             "cwd": "${workspaceRoot}",
