@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "stdlib.h": "c",
-        "system_properties.h": "c"
+        "system_properties.h": "c",
+        "elf.h": "c",
+        "elf_arm.h": "c"
     }
 }

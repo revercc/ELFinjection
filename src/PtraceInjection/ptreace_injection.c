@@ -178,7 +178,7 @@ int ptrace_call(pid_t pid, void *remote_proc )
 //injection remote process
 int inject_remote_process(pid_t pid, const char *lib_path, void * remote_module_base)
 {
-    if(0 == pid || NULL == lib_path)    return -1;
+    if(0 == pid || NULL == lib_path || NULL == remote_module_base)    return -1;
 
     //init
     if(ptrace_init(pid)){
@@ -241,7 +241,6 @@ int inject_remote_process(pid_t pid, const char *lib_path, void * remote_module_
     *(u_long*)remote_module_base = inject_module_base;
     return 0;
 }
-
 
 
 //call remote module's func
