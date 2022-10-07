@@ -1,5 +1,6 @@
 #include "../include/elf_injection.h"
 #include "../include/ptrace_injection.h"
+#include "../include/rely_injection.h"
 #include "../include/global_data.h"
 
 #include "stdio.h"

@@ -15,10 +15,9 @@
             "request": "launch",
 
             "args": [
-                "-p",
-                "21335",
-                "/data/local/tmp/libtest.so",
-                "message_test"
+                "-e",
+                "/data/local/tmp/elfprocess",
+                "/data/local/tmp/libtest.so"
             ],
 
             "cwd": "${workspaceRoot}",
@@ -27,7 +26,7 @@
 
             "additionalSOLibSearchPath": "${workspaceRoot}/bin/armeabi-v7a",  //目标调试库（带符号）
 
-            "miDebuggerServerAddress": "localhost:5555",             //设置本地通信端口
+            "miDebuggerServerAddress": "localhost:5050",             //设置本地通信端口
 
             "setupCommands": [
 
