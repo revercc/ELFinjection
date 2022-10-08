@@ -6,7 +6,6 @@
 #include <error.h>
 #include <string.h>
 #include <elf.h>
-
 //get new file size after add a rely
 size_t get_new_file_size(
     FILE *fd, 
@@ -52,20 +51,31 @@ size_t get_new_file_size(
         memset(file_buffer, 0, file_size);
         fseek(fd, 0, SEEK_SET);
         if(1 == fread(file_buffer, file_size, 1, fd)){
-            Elf32_Ehdr* elf_header = (Elf32_Ehdr *)file_buffer;
             size_t new_dynamic_size = 0;
             size_t new_dynstr_size = 0;
             size_t new_interp_size = 0;
             size_t new_note_size = 0;
+            #ifdef  __arm__
+            Elf32_Ehdr* elf_header = (Elf32_Ehdr *)file_buffer;
             Elf32_Phdr * program_header = NULL; 
             *p_new_program_header_table_size = elf_header->e_phentsize * elf_header->e_phnum + sizeof(Elf32_Phdr);
+            size_t Elf_Phdr_size = sizeof(Elf32_Phdr);
+            size_t Elf_Dyn_size = sizeof(Elf32_Dyn);
+            Elf32_Dyn* dynamic_them = NULL;
+            #elif   __aarch64__
+            Elf64_Ehdr* elf_header = (Elf64_Ehdr *)file_buffer;
+            Elf64_Phdr * program_header = NULL; 
+            *p_new_program_header_table_size = elf_header->e_phentsize * elf_header->e_phnum + sizeof(Elf64_Phdr);
+            size_t Elf_Phdr_size = sizeof(Elf64_Phdr);
+            size_t Elf_Dyn_size = sizeof(Elf64_Dyn);
+            Elf64_Dyn* dynamic_them = NULL;
+            #endif
             for(int i = 0; i < elf_header->e_phnum; i++){
-                program_header = file_buffer + elf_header->e_phoff + i * sizeof(Elf32_Phdr);
+                program_header = file_buffer + elf_header->e_phoff + i * Elf_Phdr_size;
                 if(PT_DYNAMIC == program_header->p_type){
-                    new_dynamic_size = program_header->p_filesz + sizeof(Elf32_Dyn);
-                    Elf32_Dyn* dynamic_them = NULL;
-                    for(int i = 0; i * sizeof(Elf32_Dyn) < program_header->p_filesz; i++){
-                        dynamic_them = file_buffer + program_header->p_offset + i * sizeof(Elf32_Dyn);
+                    new_dynamic_size = program_header->p_filesz + Elf_Dyn_size;
+                    for(int i = 0; i * Elf_Dyn_size < program_header->p_filesz; i++){
+                        dynamic_them = file_buffer + program_header->p_offset + i * Elf_Dyn_size;
                         if(DT_STRTAB == dynamic_them->d_tag){
                             uint8_t *dynstr_them = file_buffer + dynamic_them->d_un.d_ptr + 1;
                             new_dynstr_size += 1;
@@ -110,14 +120,24 @@ int move_dynstr(FILE *fd, uint8_t *new_file_buffer, u_long new_dynstr_off, const
     int ret = -1;
     if(NULL == fd || NULL == new_file_buffer || NULL == lib_path || NULL == p_lib_path_index)   return -1;
 
+    #ifdef  __arm__
     Elf32_Ehdr* elf_header = (Elf32_Ehdr *)new_file_buffer;    
     Elf32_Phdr * program_header = NULL; 
+    size_t Elf_Phdr_size = sizeof(Elf32_Phdr);
+    size_t Elf_Dyn_size = sizeof(Elf32_Dyn);
+    Elf32_Dyn* dynamic_them = NULL;
+    #elif   __aarch64__
+    Elf64_Ehdr* elf_header = (Elf64_Ehdr *)new_file_buffer;    
+    Elf64_Phdr * program_header = NULL;
+    size_t Elf_Phdr_size = sizeof(Elf64_Phdr);
+    size_t Elf_Dyn_size = sizeof(Elf64_Dyn);
+    Elf64_Dyn* dynamic_them = NULL;
+    #endif
     for(int i = 0; i < elf_header->e_phnum; i++){
-        program_header = new_file_buffer+ elf_header->e_phoff + i * sizeof(Elf32_Phdr);
+        program_header = new_file_buffer+ elf_header->e_phoff + i * Elf_Phdr_size;
         if(PT_DYNAMIC == program_header->p_type){
-            Elf32_Dyn* dynamic_them = 0;
-            for(int i = 0; i * sizeof(Elf32_Dyn) < program_header->p_filesz; i++){
-                dynamic_them = new_file_buffer+ program_header->p_offset + i * sizeof(Elf32_Dyn);
+            for(int i = 0; i * Elf_Dyn_size < program_header->p_filesz; i++){
+                dynamic_them = new_file_buffer+ program_header->p_offset + i * Elf_Dyn_size;
                 if(DT_STRTAB == dynamic_them->d_tag){
                     uint8_t *dynstr_them = new_file_buffer + dynamic_them->d_un.d_ptr + 1; 
                     uint8_t *new_dynstr_them = new_file_buffer + new_dynstr_off + 1;    
@@ -145,18 +165,32 @@ int move_dynamic(FILE *fd, uint8_t *new_file_buffer, u_long new_dynamic_off, u_l
     int ret = -1;
     if(NULL == fd || NULL == new_file_buffer)   return -1;
 
+    #ifdef  __arm__
     Elf32_Ehdr* elf_header = (Elf32_Ehdr *)new_file_buffer;
     Elf32_Phdr * program_header = NULL; 
+    size_t Elf_Phdr_size = sizeof(Elf32_Phdr);
+    size_t Elf_Dyn_size = sizeof(Elf32_Dyn);
+    //build new DT_NEEDED
+    Elf32_Dyn new_dynamic_them = {0};
+    new_dynamic_them.d_tag = DT_NEEDED;
+    new_dynamic_them.d_un.d_ptr = lib_path_index;
+    *(Elf32_Dyn*)(new_file_buffer + new_dynamic_off) = new_dynamic_them; 
+    #elif   __aarch64__
+    Elf64_Ehdr* elf_header = (Elf64_Ehdr *)new_file_buffer;
+    Elf64_Phdr * program_header = NULL; 
+    size_t Elf_Phdr_size = sizeof(Elf64_Phdr);
+    size_t Elf_Dyn_size = sizeof(Elf64_Dyn);
+    //build new DT_NEEDED
+    Elf64_Dyn new_dynamic_them = {0};
+    new_dynamic_them.d_tag = DT_NEEDED;
+    new_dynamic_them.d_un.d_ptr = lib_path_index;
+    *(Elf64_Dyn*)(new_file_buffer + new_dynamic_off) = new_dynamic_them;
+    #endif  
     for(int i = 0; i < elf_header->e_phnum; i++){
-        program_header = new_file_buffer + elf_header->e_phoff + i * sizeof(Elf32_Phdr);
+        program_header = new_file_buffer + elf_header->e_phoff + i * Elf_Phdr_size;
         if(PT_DYNAMIC == program_header->p_type){
-            //build new DT_NEEDED
-            Elf32_Dyn new_dynamic_them = {0};
-            new_dynamic_them.d_tag = DT_NEEDED;
-            new_dynamic_them.d_un.d_ptr = lib_path_index;
-            *(Elf32_Dyn*)(new_file_buffer + new_dynamic_off) = new_dynamic_them;
             //copy old .dynamic program
-            memcpy(new_file_buffer + new_dynamic_off + sizeof(Elf32_Dyn), new_file_buffer + program_header->p_offset, program_header->p_filesz);
+            memcpy(new_file_buffer + new_dynamic_off + Elf_Dyn_size, new_file_buffer + program_header->p_offset, program_header->p_filesz);
             ret = 0;
             break;
         }
@@ -169,11 +203,17 @@ int move_interp_or_note(FILE *fd, uint8_t *new_file_buffer, u_long new_interp_of
 {
     int ret = -1;
     if(NULL == fd || NULL == new_file_buffer)   return -1;
-
+    #ifdef  __arm__
     Elf32_Ehdr* elf_header = (Elf32_Ehdr *)new_file_buffer;
     Elf32_Phdr * program_header = NULL; 
+    size_t Elf_Phdr_size = sizeof(Elf32_Phdr);
+    #elif   __aarch64__
+    Elf64_Ehdr* elf_header = (Elf64_Ehdr *)new_file_buffer;
+    Elf64_Phdr * program_header = NULL; 
+    size_t Elf_Phdr_size = sizeof(Elf64_Phdr);
+    #endif
     for(int i = 0; i < elf_header->e_phnum; i++){
-        program_header = new_file_buffer + elf_header->e_phoff + i * sizeof(Elf32_Phdr);
+        program_header = new_file_buffer + elf_header->e_phoff + i * Elf_Phdr_size;
         if(PT_INTERP == program_header->p_type){
             memcpy(new_file_buffer + new_interp_off, new_file_buffer + program_header->p_offset, program_header->p_filesz);
             memset(new_file_buffer + program_header->p_offset, 0, program_header->p_filesz);
@@ -193,14 +233,23 @@ int add_load_program(FILE *fd, uint8_t *new_file_buffer, u_long new_load_program
 {
     if(NULL == fd || NULL == new_file_buffer || NULL == p_new_load_program_addr)   return -1;
 
+    #ifdef  __arm__
     Elf32_Ehdr *elf_header = (Elf32_Ehdr *)new_file_buffer;
     Elf32_Phdr *program_header = NULL;
     Elf32_Addr last_load_program_addr_end = 0;
+    Elf32_Word aligned_size = 0;
+    size_t Elf_Phdr_size = sizeof(Elf32_Phdr);
+    #elif   __aarch64__
+    Elf64_Ehdr *elf_header = (Elf64_Ehdr *)new_file_buffer;
+    Elf64_Phdr *program_header = NULL;
+    Elf64_Addr last_load_program_addr_end = 0;
+    Elf64_Word aligned_size = 0;
+    size_t Elf_Phdr_size = sizeof(Elf64_Phdr);
+    #endif
     //get last load program addr end
     for(int i = 0; i < elf_header->e_phnum; i++){
-        program_header = new_file_buffer + elf_header->e_phoff + i * sizeof(Elf32_Phdr);
+        program_header = new_file_buffer + elf_header->e_phoff + i * Elf_Phdr_size;
         if(PT_LOAD == program_header->p_type){
-            Elf32_Word aligned_size = 0;
             aligned_size = ((program_header->p_memsz % program_header->p_align) ? (program_header->p_memsz / program_header->p_align + 1) : (program_header->p_memsz / program_header->p_align)) * program_header->p_align;
             if(program_header->p_vaddr + aligned_size > last_load_program_addr_end){
                 last_load_program_addr_end = program_header->p_vaddr + aligned_size;
@@ -210,7 +259,11 @@ int add_load_program(FILE *fd, uint8_t *new_file_buffer, u_long new_load_program
     *p_new_load_program_addr = ((last_load_program_addr_end % PAGE_SIZE) ? (last_load_program_addr_end / PAGE_SIZE + 1) : (last_load_program_addr_end / PAGE_SIZE)) * PAGE_SIZE;
 
     //build new PT_LOAD 
-    Elf32_Phdr new_program_header_them = {0};
+    #ifdef  __arm__
+    Elf32_Phdr new_program_header_them = {0};  
+    #elif   __aarch64__
+    Elf64_Phdr new_program_header_them = {0};
+    #endif
     new_program_header_them.p_type = PT_LOAD;
     new_program_header_them.p_offset = new_load_program_off;
     new_program_header_them.p_vaddr = *p_new_load_program_addr;
@@ -219,7 +272,7 @@ int add_load_program(FILE *fd, uint8_t *new_file_buffer, u_long new_load_program
     new_program_header_them.p_memsz = new_load_program_size;
     new_program_header_them.p_flags = PF_R | PF_W | PF_X;
     new_program_header_them.p_align = PAGE_SIZE;
-    *(Elf32_Phdr*)(new_file_buffer + elf_header->e_phoff + (elf_header->e_phentsize * elf_header->e_phnum)) = new_program_header_them;
+    memcpy(new_file_buffer + elf_header->e_phoff + (elf_header->e_phentsize * elf_header->e_phnum), &new_program_header_them, Elf_Phdr_size);
     return 0;
 }
 
@@ -246,13 +299,28 @@ int revise_new_elf_file(
 {
     if(NULL == fd || NULL == new_file_buffer)   return -1;
 
-    //revise elf header
+    #ifdef __arm__
     Elf32_Ehdr *elf_header = (Elf32_Ehdr *)new_file_buffer;
-    elf_header->e_phnum++;
     Elf32_Phdr *program_header = NULL;
+    Elf32_Shdr *section_header = NULL;
+    Elf32_Dyn* dynamic_them = NULL;
+    size_t Elf_Phdr_size = sizeof(Elf32_Phdr);
+    size_t Elf_Dyn_size = sizeof(Elf32_Dyn);
+    size_t Elf_Shdr_size = sizeof(Elf32_Shdr);
+    #elif __aarch64__
+    Elf64_Ehdr *elf_header = (Elf64_Ehdr *)new_file_buffer;
+    Elf64_Phdr *program_header = NULL;
+    Elf64_Shdr *section_header = NULL;
+    Elf64_Dyn* dynamic_them = NULL;
+    size_t Elf_Phdr_size = sizeof(Elf64_Phdr);
+    size_t Elf_Dyn_size = sizeof(Elf64_Dyn);
+    size_t Elf_Shdr_size = sizeof(Elf64_Shdr);
+    #endif
+    //revise elf header
+    elf_header->e_phnum++;
     //revise program header table
     for(int i = 0; i < elf_header->e_phnum; i++){
-        program_header = new_file_buffer + elf_header->e_phoff + i * sizeof(Elf32_Phdr);
+        program_header = new_file_buffer + elf_header->e_phoff + i * Elf_Phdr_size;
         if(PT_PHDR == program_header->p_type){
             program_header->p_filesz = new_program_header_table_size;
             program_header->p_memsz = new_program_header_table_size;
@@ -264,9 +332,8 @@ int revise_new_elf_file(
             program_header->p_filesz = new_dynamic_size;
             program_header->p_memsz = new_dynamic_size;
             //revise dynamic's DT_STRTAB and DT_STRSZ
-            Elf32_Dyn* dynamic_them = NULL;
-            for(int i = 0; i * sizeof(Elf32_Dyn) < program_header->p_filesz; i++){
-                dynamic_them = new_file_buffer+ program_header->p_offset + i * sizeof(Elf32_Dyn);
+            for(int i = 0; i * Elf_Dyn_size < program_header->p_filesz; i++){
+                dynamic_them = new_file_buffer+ program_header->p_offset + i * Elf_Dyn_size;
                 if(DT_STRTAB == dynamic_them->d_tag){
                     dynamic_them->d_un.d_ptr = new_dynstr_addr;
                 }
@@ -293,9 +360,8 @@ int revise_new_elf_file(
         }
     }
     //revise section header table
-    Elf32_Shdr *section_header = NULL;
     for(int i = 0; i < elf_header->e_shnum; i++){
-        section_header = new_file_buffer + elf_header->e_shoff + i * sizeof(Elf32_Shdr);
+        section_header = new_file_buffer + elf_header->e_shoff + i * Elf_Shdr_size;
         if(SHT_DYNAMIC == section_header->sh_type){
             section_header->sh_addr = new_dynamic_addr;
             section_header->sh_offset = new_dynamic_off;
@@ -364,6 +430,12 @@ int add_rely_lib(const char *dest_lib_path, const char *source_lib_path)
     Elf64_Off new_dynstr_off = 0;
     Elf64_Word new_dynstr_size = 0;
     Elf64_Addr new_dynstr_addr = 0;
+    Elf64_Off new_interp_off = 0;
+    Elf64_Word new_interp_size = 0;
+    Elf64_Addr new_interp_addr = 0;
+    Elf64_Off new_note_off = 0;
+    Elf64_Word new_note_size = 0;
+    Elf64_Addr new_note_addr = 0;
     Elf64_Addr lib_path_index = 0;
     #endif
     
