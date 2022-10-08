@@ -13,8 +13,3 @@ ELFinjection is a simple utility for inject so, it can do the following:
   ```
   ./ELFinjection -e  <elf_path>  <so_path>
   ```
-  example:
-  ![](c:/Users/Administrator.DESKTOP-BA7RGS4/AppData/Roaming/Tencent/Users/2535836763/QQ/WinTemp/RichOle/AG3XPYHJPTE4%5B%5DV7L_U~BT2.png)
-
-  readelf -d 
-  ![](c:/Users/Administrator.DESKTOP-BA7RGS4/AppData/Roaming/Tencent/Users/2535836763/QQ/WinTemp/RichOle/8B@@X%5B_O7U5R)P@CYUV93%60U.png)
