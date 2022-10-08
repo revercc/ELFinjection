@@ -17,10 +17,13 @@ size_t get_new_file_size(
     u_long *p_new_load_program_size,
     u_long *p_new_dynamic_off,
     u_long *p_new_dynamic_size,
-    u_long *p_new_program_header_table_off,
-    u_long *p_new_program_header_table_size,
     u_long *p_new_dynstr_off,
-    u_long *p_new_dynstr_size)
+    u_long *p_new_dynstr_size,
+    u_long *p_new_interp_off,
+    u_long *p_new_interp_size,
+    u_long *p_new_note_off,
+    u_long *p_new_note_size,
+    u_long *p_new_program_header_table_size)
 {   
     if(
         NULL == fd || 
@@ -30,10 +33,13 @@ size_t get_new_file_size(
         NULL == p_new_load_program_size ||
         NULL == p_new_dynamic_off || 
         NULL == p_new_dynamic_size || 
-        NULL == p_new_program_header_table_off ||
-        NULL == p_new_program_header_table_size ||
         NULL == p_new_dynstr_off || 
-        NULL == p_new_dynstr_size)    
+        NULL == p_new_dynstr_size ||
+        NULL == p_new_interp_off ||
+        NULL == p_new_interp_size ||
+        NULL == p_new_note_off ||
+        NULL == p_new_note_size ||
+        NULL == p_new_program_header_table_size)    
         return -1;
 
     size_t ret = -1;
@@ -47,10 +53,12 @@ size_t get_new_file_size(
         fseek(fd, 0, SEEK_SET);
         if(1 == fread(file_buffer, file_size, 1, fd)){
             Elf32_Ehdr* elf_header = (Elf32_Ehdr *)file_buffer;
-            size_t new_program_header_table_size = elf_header->e_phentsize * elf_header->e_phnum + sizeof(Elf32_Phdr);
             size_t new_dynamic_size = 0;
             size_t new_dynstr_size = 0;
+            size_t new_interp_size = 0;
+            size_t new_note_size = 0;
             Elf32_Phdr * program_header = NULL; 
+            *p_new_program_header_table_size = elf_header->e_phentsize * elf_header->e_phnum + sizeof(Elf32_Phdr);
             for(int i = 0; i < elf_header->e_phnum; i++){
                 program_header = file_buffer + elf_header->e_phoff + i * sizeof(Elf32_Phdr);
                 if(PT_DYNAMIC == program_header->p_type){
@@ -66,23 +74,29 @@ size_t get_new_file_size(
                                 dynstr_them = dynstr_them + strlen(dynstr_them) + 1;
                             }
                             new_dynstr_size = new_dynstr_size + strlen(lib_path) + 2;
-                            break;
                         }
                     }
-                    break;
+                }
+                else if(PT_INTERP == program_header->p_type){
+                    new_interp_size = program_header->p_filesz;
+                }
+                else if(PT_NOTE == program_header->p_type){
+                    new_note_size = program_header->p_filesz;
                 }
             }
             //get new file size
-            if(new_program_header_table_size && new_dynamic_size && new_dynstr_size){
+            if(new_dynamic_size && new_dynstr_size && new_interp_size && new_note_size){
                 *p_new_load_program_off = align_file_size;
-                *p_new_load_program_size = new_program_header_table_size + new_dynamic_size + new_dynstr_size;
+                *p_new_load_program_size =  new_dynamic_size + new_dynstr_size + new_interp_size + new_note_size;
                 *p_new_dynamic_off = align_file_size;
                 *p_new_dynamic_size = new_dynamic_size;
-                *p_new_program_header_table_off = align_file_size + new_dynamic_size;
-                *p_new_program_header_table_size = new_program_header_table_size;
-                *p_new_dynstr_off = align_file_size + new_dynamic_size + new_program_header_table_size;
+                *p_new_dynstr_off = align_file_size + new_dynamic_size;
                 *p_new_dynstr_size = new_dynstr_size;
-                ret = align_file_size + new_program_header_table_size + new_dynamic_size + new_dynstr_size;
+                *p_new_interp_off = align_file_size + new_dynamic_size + new_dynstr_size;
+                *p_new_interp_size = new_interp_size;
+                *p_new_note_off = align_file_size + new_dynamic_size + new_dynstr_size + new_interp_size;
+                *p_new_note_size = new_note_size;
+                ret = align_file_size + new_dynamic_size + new_dynstr_size + new_interp_size + new_note_size;
             }
         }
         free(file_buffer);
@@ -150,8 +164,32 @@ int move_dynamic(FILE *fd, uint8_t *new_file_buffer, u_long new_dynamic_off, u_l
     return ret;
 }
 
-//move program header table to file end
-int move_program_header_table(FILE *fd, uint8_t *new_file_buffer, u_long new_program_header_table_off, u_long new_load_program_off, u_long new_load_program_size, u_long *p_new_load_program_addr)
+//mov interp or note
+int move_interp_or_note(FILE *fd, uint8_t *new_file_buffer, u_long new_interp_off, u_long new_note_off)
+{
+    int ret = -1;
+    if(NULL == fd || NULL == new_file_buffer)   return -1;
+
+    Elf32_Ehdr* elf_header = (Elf32_Ehdr *)new_file_buffer;
+    Elf32_Phdr * program_header = NULL; 
+    for(int i = 0; i < elf_header->e_phnum; i++){
+        program_header = new_file_buffer + elf_header->e_phoff + i * sizeof(Elf32_Phdr);
+        if(PT_INTERP == program_header->p_type){
+            memcpy(new_file_buffer + new_interp_off, new_file_buffer + program_header->p_offset, program_header->p_filesz);
+            memset(new_file_buffer + program_header->p_offset, 0, program_header->p_filesz);
+            ret = 0;
+        }
+        else if(PT_NOTE == program_header->p_type){
+            memcpy(new_file_buffer + new_note_off, new_file_buffer + program_header->p_offset, program_header->p_filesz);
+            memset(new_file_buffer + program_header->p_offset, 0, program_header->p_filesz);
+            ret = 0;
+        }
+    }
+    return ret;
+}
+
+//add load program
+int add_load_program(FILE *fd, uint8_t *new_file_buffer, u_long new_load_program_off, u_long new_load_program_size, u_long *p_new_load_program_addr)
 {
     if(NULL == fd || NULL == new_file_buffer || NULL == p_new_load_program_addr)   return -1;
 
@@ -169,20 +207,19 @@ int move_program_header_table(FILE *fd, uint8_t *new_file_buffer, u_long new_pro
             }
         }
     }
+    *p_new_load_program_addr = ((last_load_program_addr_end % PAGE_SIZE) ? (last_load_program_addr_end / PAGE_SIZE + 1) : (last_load_program_addr_end / PAGE_SIZE)) * PAGE_SIZE;
+
     //build new PT_LOAD 
     Elf32_Phdr new_program_header_them = {0};
     new_program_header_them.p_type = PT_LOAD;
     new_program_header_them.p_offset = new_load_program_off;
-    new_program_header_them.p_vaddr = last_load_program_addr_end + PAGE_SIZE;
-    new_program_header_them.p_paddr = last_load_program_addr_end + PAGE_SIZE;
+    new_program_header_them.p_vaddr = *p_new_load_program_addr;
+    new_program_header_them.p_paddr = *p_new_load_program_addr;
     new_program_header_them.p_filesz = new_load_program_size;
     new_program_header_them.p_memsz = new_load_program_size;
     new_program_header_them.p_flags = PF_R | PF_W | PF_X;
     new_program_header_them.p_align = PAGE_SIZE;
-    
-    memcpy(new_file_buffer + new_program_header_table_off, new_file_buffer + elf_header->e_phoff, elf_header->e_phentsize * elf_header->e_phnum);
-    *(Elf32_Phdr*)(new_file_buffer + new_program_header_table_off + (elf_header->e_phentsize * elf_header->e_phnum)) = new_program_header_them;
-    *p_new_load_program_addr = ((last_load_program_addr_end % PAGE_SIZE) ? (last_load_program_addr_end / PAGE_SIZE + 1) : (last_load_program_addr_end / PAGE_SIZE)) * PAGE_SIZE;
+    *(Elf32_Phdr*)(new_file_buffer + elf_header->e_phoff + (elf_header->e_phentsize * elf_header->e_phnum)) = new_program_header_them;
     return 0;
 }
 
@@ -192,31 +229,31 @@ int revise_new_elf_file(
     uint8_t *new_file_buffer,
     u_long new_load_program_off,
     u_long new_load_program_size,
-    u_long new_load_program_addr,
-    u_long new_program_header_table_off, 
+    u_long new_load_program_addr, 
     u_long new_program_header_table_size, 
-    u_long new_program_header_table_addr, 
     u_long new_dynamic_off,
     u_long new_dynamic_size,
     u_long new_dynamic_addr,
     u_long new_dynstr_off,
     u_long new_dynstr_size,
-    u_long new_dynstr_addr)
+    u_long new_dynstr_addr,
+    u_long new_interp_off,
+    u_long new_interp_size,
+    u_long new_interp_addr,
+    u_long new_note_off,
+    u_long new_note_size,
+    u_long new_note_addr)
 {
     if(NULL == fd || NULL == new_file_buffer)   return -1;
 
     //revise elf header
     Elf32_Ehdr *elf_header = (Elf32_Ehdr *)new_file_buffer;
-    elf_header->e_phnum ++;
-    elf_header->e_phoff = new_program_header_table_off;
+    elf_header->e_phnum++;
     Elf32_Phdr *program_header = NULL;
     //revise program header table
     for(int i = 0; i < elf_header->e_phnum; i++){
         program_header = new_file_buffer + elf_header->e_phoff + i * sizeof(Elf32_Phdr);
         if(PT_PHDR == program_header->p_type){
-            program_header->p_offset = new_program_header_table_off;
-            program_header->p_vaddr = new_program_header_table_addr;
-            program_header->p_paddr = new_program_header_table_addr;
             program_header->p_filesz = new_program_header_table_size;
             program_header->p_memsz = new_program_header_table_size;
         }
@@ -238,14 +275,21 @@ int revise_new_elf_file(
                 }
             }
         }
-        else if(PT_LOAD == program_header->p_type){
-            if((elf_header->e_phnum - 1) == i){
-                program_header->p_offset = new_load_program_off;
-                program_header->p_vaddr = new_load_program_addr;
-                program_header->p_paddr = new_load_program_addr;
-                program_header->p_filesz = new_load_program_size;
-                program_header->p_memsz = new_load_program_size;
-            }
+        else if(PT_INTERP == program_header->p_type){
+            program_header->p_offset = new_interp_off;
+            program_header->p_vaddr = new_interp_addr;
+            program_header->p_paddr = new_interp_addr;
+            program_header->p_filesz = new_interp_size;
+            program_header->p_memsz = new_interp_size;
+
+        }
+        else if(PT_NOTE == program_header->p_type){
+            program_header->p_offset = new_note_off;
+            program_header->p_vaddr = new_note_addr;
+            program_header->p_paddr = new_note_addr;
+            program_header->p_filesz = new_note_size;
+            program_header->p_memsz = new_note_size;
+
         }
     }
     //revise section header table
@@ -262,6 +306,15 @@ int revise_new_elf_file(
             section_header->sh_addr = new_dynstr_addr;
             section_header->sh_offset = new_dynstr_off;
             section_header->sh_size = new_dynstr_size;
+        }
+        //.interp
+        else if(SHT_PROGBITS == section_header->sh_type && SHF_ALLOC == section_header){
+            section_header->sh_addr = new_interp_addr;
+            section_header->sh_offset = new_interp_off;
+            section_header->sh_size = new_interp_size;
+        }
+        else if(SHT_NOTE == section_header->sh_type){
+
         }
     }
     
@@ -289,12 +342,16 @@ int add_rely_lib(const char *dest_lib_path, const char *source_lib_path)
     Elf32_Off new_dynamic_off = 0;
     Elf32_Word new_dynamic_size = 0;
     Elf32_Addr new_dynamic_addr = 0;
-    Elf32_Off new_program_header_table_off = 0;
     Elf32_Word new_program_header_table_size = 0;
-    Elf32_Addr new_program_header_table_addr = 0;
     Elf32_Off new_dynstr_off = 0;
     Elf32_Word new_dynstr_size = 0;
     Elf32_Addr new_dynstr_addr = 0;
+    Elf32_Off new_interp_off = 0;
+    Elf32_Word new_interp_size = 0;
+    Elf32_Addr new_interp_addr = 0;
+    Elf32_Off new_note_off = 0;
+    Elf32_Word new_note_size = 0;
+    Elf32_Addr new_note_addr = 0;
     Elf32_Addr lib_path_index = 0;
     #elif __aarch64__
     Elf64_Off new_load_program_off = 0;
@@ -303,9 +360,7 @@ int add_rely_lib(const char *dest_lib_path, const char *source_lib_path)
     Elf64_Off new_dynamic_off = 0;
     Elf64_Word new_dynamic_size = 0;
     Elf64_Addr new_dynamic_addr = 0;
-    Elf64_Off new_program_header_table_off = 0;
     Elf64_Word new_program_header_table_size = 0;
-    Elf64_Addr new_program_header_table_addr = 0;
     Elf64_Off new_dynstr_off = 0;
     Elf64_Word new_dynstr_size = 0;
     Elf64_Addr new_dynstr_addr = 0;
@@ -322,11 +377,15 @@ int add_rely_lib(const char *dest_lib_path, const char *source_lib_path)
         &new_load_program_size,
         &new_dynamic_off,
         &new_dynamic_size,
-        &new_program_header_table_off,
-        &new_program_header_table_size,
         &new_dynstr_off,
-        &new_dynstr_size
+        &new_dynstr_size,
+        &new_interp_off,
+        &new_interp_size,
+        &new_note_off,
+        &new_note_size,
+        &new_program_header_table_size
         );
+
     if(-1 != new_file_size){
         uint8_t *new_file_buffer = (uint8_t *)malloc(new_file_size);
         if(NULL != new_file_buffer){
@@ -338,27 +397,33 @@ int add_rely_lib(const char *dest_lib_path, const char *source_lib_path)
                 if(0 == move_dynstr(fd, new_file_buffer, new_dynstr_off, source_lib_path, &lib_path_index) &&
                     //将.dynamic节区移动到文件末尾并在开头增加新的一项（DT_NEEDED 
                    0 == move_dynamic(fd, new_file_buffer, new_dynamic_off, lib_path_index) &&
-                    //将program header tabel移动到文件末尾并在尾部增加新的一项（PT_LOAD类型的项
-                   0 == move_program_header_table(fd, new_file_buffer, new_program_header_table_off, new_load_program_off, new_load_program_size, &new_load_program_addr)){
-                    //修正各个字段
+                   0 == move_interp_or_note(fd, new_file_buffer, new_interp_off, new_note_off)){
+                    //add load program
+                    add_load_program(fd, new_file_buffer, new_load_program_off, new_load_program_size, &new_load_program_addr);
+                    //revise elf
                     new_dynamic_addr = new_load_program_addr;
-                    new_program_header_table_addr = new_dynamic_addr + new_dynamic_size;
-                    new_dynstr_addr = new_program_header_table_addr + new_program_header_table_size;
+                    new_dynstr_addr =  new_dynamic_addr + new_dynamic_size;
+                    new_interp_addr = new_dynamic_addr + new_dynamic_size;
+                    new_note_addr = new_interp_addr + new_interp_size;
                     if(0 == revise_new_elf_file(
                         fd, 
                         new_file_buffer, 
                         new_load_program_off,
                         new_load_program_size,
                         new_load_program_addr,
-                        new_program_header_table_off, 
-                        new_program_header_table_size, 
-                        new_program_header_table_addr, 
+                        new_program_header_table_size,
                         new_dynamic_off,
                         new_dynamic_size,
                         new_dynamic_addr,
                         new_dynstr_off,
                         new_dynstr_size,
-                        new_dynstr_addr)){
+                        new_dynstr_addr,
+                        new_interp_off,
+                        new_interp_size,
+                        new_interp_addr,
+                        new_note_off,
+                        new_note_size,
+                        new_note_addr)){
                             fseek(fd, 0, SEEK_SET);
                             if(1 == fwrite(new_file_buffer, new_file_size, 1, fd)){
                                 ret = 0;
