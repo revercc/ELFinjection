@@ -9,7 +9,7 @@
 
 int main(int argc, char *argv[], char *envp[])
 {
-    //-p pid libpath procname or -e destlibpath sourcelibpath
+    //-p pid libpath funcname or -e destlib_path source_libpath
     if(1 == argc || (strcmp(argv[1], "-p") && strcmp(argv[1], "-e"))){
         printf("please input -p or -e");
         return 0;
