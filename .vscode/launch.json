@@ -15,16 +15,17 @@
             "request": "launch",
 
             "args": [
-                "-e",
+                "-p",
+                "4306",
                 "/data/local/tmp/elfprocess",
-                "/data/local/tmp/libtest.so"
+                "message_test"
             ],
 
             "cwd": "${workspaceRoot}",
 
-            "program": "${workspaceRoot}/obj/local/arm64-v8a/ELFinjection",           //目标调试程序（带符号）
+            "program": "${workspaceRoot}/obj/local/armeabi-v7a/ELFinjection",           //目标调试程序（带符号）
 
-            "additionalSOLibSearchPath": "${workspaceRoot}/bin/arm64-v8a",  //目标调试库（带符号）
+            "additionalSOLibSearchPath": "${workspaceRoot}/bin/armeabi-v7a",  //目标调试库（带符号）
 
             "miDebuggerServerAddress": "localhost:5050",             //设置本地通信端口
 
@@ -42,7 +43,7 @@
 
                 {
 
-                    "text": "set sysroot ${workspaceRoot}/bin/arm64-v8a",
+                    "text": "set sysroot ${workspaceRoot}/bin/armeabi-v7a",
 
                     "description": "set sysroot path"
 

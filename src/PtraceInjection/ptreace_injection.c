@@ -219,7 +219,7 @@ int inject_remote_process(pid_t pid, const char *lib_path, void * remote_module_
 
     #ifdef  __arm__
     struct pt_regs old_regs = {0};
-    struct pt_regs new_regs = old_regs;
+    struct pt_regs new_regs = {0};
     u_long PT_GETREGS = PTRACE_GETREGS;
     u_long PT_SETREGS = PTRACE_SETREGS;
     #elif   __aarch64__
@@ -241,6 +241,7 @@ int inject_remote_process(pid_t pid, const char *lib_path, void * remote_module_
     if(ptrace(PT_GETREGS, pid, NULL, &old_regs)){
         return -1;
     }
+    new_regs = old_regs;
     //remote call mmap
     u_long remote_map_addr = 0;
     u_long  parameters[6] = {0};
@@ -302,7 +303,7 @@ int call_remote_module_func(
 
     #ifdef  __arm__
     struct pt_regs old_regs = {0};
-    struct pt_regs new_regs = old_regs;
+    struct pt_regs new_regs = {0};
     u_long PT_GETREGS = PTRACE_GETREGS;
     u_long PT_SETREGS = PTRACE_SETREGS;
     #elif   __aarch64__
@@ -324,6 +325,7 @@ int call_remote_module_func(
     if(ptrace(PT_GETREGS, pid, NULL, &old_regs)){
         return -1;
     }
+    new_regs = old_regs;
     //remote call mmap
     u_long remote_map_addr = 0;
     u_long  parameters[MAX_PARAMENUM] = {0};
