@@ -11,7 +11,7 @@ int main(int argc, char *argv[], char *envp[])
 {
     //-p pid libpath funcname or -e destlib_path source_libpath
     if(1 == argc || (strcmp(argv[1], "-p") && strcmp(argv[1], "-e"))){
-        printf("please input -p or -e");
+        printf("please input -p or -e\n");
         return 0;
     }
     //switch param
@@ -22,7 +22,7 @@ int main(int argc, char *argv[], char *envp[])
         void *remote_module_base = NULL;
         //inject remote process 
         if(inject_remote_process(pid, lib_path, &remote_module_base)){
-            printf("inject remote process is error!");
+            printf("inject remote process is error!\n");
             return 0;
         }
         if(5 == argc){
@@ -31,7 +31,7 @@ int main(int argc, char *argv[], char *envp[])
             u_long remote_module_func_ret = 0;
             //call remote process func
             if(call_remote_module_func(pid, remote_module_base, remote_func_name, NULL, 0, &remote_module_func_ret)){
-                printf("remote func call is error!");
+                printf("remote func call is error!\n");
                 return 0;
             }
         }
@@ -42,7 +42,7 @@ int main(int argc, char *argv[], char *envp[])
         strcpy(dest_lib_path, argv[2]);
         strcpy(source_lib_path, argv[3]);
         if(add_rely_lib(dest_lib_path, source_lib_path)){
-            printf("add rely lib is error!");
+            printf("add rely lib is error!\n");
             return 0;
         }
     }
