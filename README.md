@@ -1,5 +1,5 @@
 # ELFinjection
-ELFinjection is a simple utility for inject so, it can do the following:
+ELFinjection is a simple android utility for inject so, it can do the following:
 
 * Using ptrace to inject a so file into the process
   ```
