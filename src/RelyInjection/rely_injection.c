@@ -452,7 +452,6 @@ int add_rely_lib(const char *dest_lib_path, const char *source_lib_path)
         &new_note_size,
         &new_program_header_table_size
         );
-
     if(-1 != new_file_size){
         uint8_t *new_file_buffer = (uint8_t *)malloc(new_file_size);
         if(NULL != new_file_buffer){
@@ -496,7 +495,6 @@ int add_rely_lib(const char *dest_lib_path, const char *source_lib_path)
                                 ret = 0;
                             }
                         }
-    
                 }
             }
             free(new_file_buffer);

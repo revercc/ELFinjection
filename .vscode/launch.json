@@ -14,10 +14,6 @@
             "request": "launch",
 
             "args": [
-                "-p",
-                "4306",
-                "/data/local/tmp/elfprocess",
-                "message_test"
             ],
 
             "cwd": "${workspaceRoot}",
