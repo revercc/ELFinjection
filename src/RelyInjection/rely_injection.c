@@ -236,12 +236,14 @@ int add_load_program(FILE *fd, uint8_t *new_file_buffer, u_long new_load_program
     #ifdef  __arm__
     Elf32_Ehdr *elf_header = (Elf32_Ehdr *)new_file_buffer;
     Elf32_Phdr *program_header = NULL;
+    Elf32_Phdr new_program_header_them = {0};
     Elf32_Addr last_load_program_addr_end = 0;
     Elf32_Word aligned_size = 0;
     size_t Elf_Phdr_size = sizeof(Elf32_Phdr);
     #elif   __aarch64__
     Elf64_Ehdr *elf_header = (Elf64_Ehdr *)new_file_buffer;
     Elf64_Phdr *program_header = NULL;
+    Elf64_Phdr new_program_header_them = {0};
     Elf64_Addr last_load_program_addr_end = 0;
     Elf64_Word aligned_size = 0;
     size_t Elf_Phdr_size = sizeof(Elf64_Phdr);
@@ -259,11 +261,6 @@ int add_load_program(FILE *fd, uint8_t *new_file_buffer, u_long new_load_program
     *p_new_load_program_addr = ((last_load_program_addr_end % PAGE_SIZE) ? (last_load_program_addr_end / PAGE_SIZE + 1) : (last_load_program_addr_end / PAGE_SIZE)) * PAGE_SIZE;
 
     //build new PT_LOAD 
-    #ifdef  __arm__
-    Elf32_Phdr new_program_header_them = {0};  
-    #elif   __aarch64__
-    Elf64_Phdr new_program_header_them = {0};
-    #endif
     new_program_header_them.p_type = PT_LOAD;
     new_program_header_them.p_offset = new_load_program_off;
     new_program_header_them.p_vaddr = *p_new_load_program_addr;
@@ -391,16 +388,6 @@ int add_rely_lib(const char *dest_lib_path, const char *source_lib_path)
 {
     if(NULL == dest_lib_path || NULL == source_lib_path)    return -1;
 
-    int ret = -1;
-    FILE *fd = fopen(dest_lib_path, "r+");
-    if(!fd){
-        return -1;
-    }
-    size_t file_size = 0;
-    fseek(fd, 0, SEEK_END);
-    file_size = ftell(fd);
-    fseek(fd, 0, SEEK_SET);
-    //计算增加新的依赖项需要额外增加多少空间
     #ifdef __arm__
     Elf32_Off new_load_program_off = 0;
     Elf32_Word new_load_program_size = 0;
@@ -438,8 +425,16 @@ int add_rely_lib(const char *dest_lib_path, const char *source_lib_path)
     Elf64_Addr new_note_addr = 0;
     Elf64_Addr lib_path_index = 0;
     #endif
-    
-
+    int ret = -1;
+    FILE *fd = fopen(dest_lib_path, "r+");
+    if(!fd){
+        return -1;
+    }
+    size_t file_size = 0;
+    fseek(fd, 0, SEEK_END);
+    file_size = ftell(fd);
+    fseek(fd, 0, SEEK_SET);
+    //计算增加新的依赖项需要额外增加多少空间
     size_t new_file_size = get_new_file_size(
         fd, 
         file_size, 

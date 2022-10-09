@@ -14,9 +14,10 @@
             "request": "launch",
 
             "args": [
-                "-e",
+                "-p",
+                "4306",
                 "/data/local/tmp/elfprocess",
-                "/data/local/tmp/libtest.so"
+                "message_test"
             ],
 
             "cwd": "${workspaceRoot}",
