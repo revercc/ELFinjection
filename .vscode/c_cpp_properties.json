@@ -4,14 +4,14 @@
             "name": "arm",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${env:ANDROID_NDK}/sysroot/usr/include/arm-linux-androideabi/",
-                "${env:ANDROID_NDK}/sysroot/usr/include"
+                "${env:ANDROID_NDK}/sysroot/usr/include",
+                "${env:ANDROID_NDK}/sysroot/usr/include/arm-linux-androideabi/"          
             ],
             "defines":  [
                 "__arm__",
                 "__ANDROID__"
             ],
-            "cStandard": "c11",
+            "cStandard": "c17",
             "cppStandard": "c++17"
             
         },
@@ -19,15 +19,15 @@
             "name": "aarch64",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${env:ANDROID_NDK}/sysroot/usr/include/aarch64-linux-android",
-                "${env:ANDROID_NDK}/sysroot/usr/include"
+                "${env:ANDROID_NDK}/sysroot/usr/include",
+                "${env:ANDROID_NDK}/sysroot/usr/include/aarch64-linux-android"
             ],
             "defines":  [
                 "__aarch64__",
                 "__LP64__",
                 "__ANDROID__"
             ],
-            "cStandard": "c11",
+            "cStandard": "c17",
             "cppStandard": "c++17"
             
         }

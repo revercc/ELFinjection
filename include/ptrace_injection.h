@@ -10,9 +10,9 @@ void* get_module_base(pid_t pid, const char *module_name);
 //init
 int ptrace_init(pid_t pid);
 //read remote process's data of size
-int ptrace_readdata(pid_t pid, uint8_t *source, uint8_t *dest, size_t size);
+long ptrace_readdata(pid_t pid, uint8_t *source, uint8_t *dest, size_t size);
 //write remote process's data of size
-int ptrace_writedata(pid_t pid, uint8_t *source, uint8_t *dest, size_t size);
+long ptrace_writedata(pid_t pid, uint8_t *source, uint8_t *dest, size_t size);
 
 
 //injection remote process

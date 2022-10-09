@@ -3,6 +3,7 @@
         "stdlib.h": "c",
         "system_properties.h": "c",
         "elf.h": "c",
-        "elf_arm.h": "c"
+        "elf_arm.h": "c",
+        "ptrace.h": "c"
     }
 }

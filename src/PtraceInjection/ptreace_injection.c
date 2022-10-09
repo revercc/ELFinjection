@@ -62,7 +62,6 @@ int ptrace_init(pid_t remote_pid)
             strcpy(g_linker_path, "/apex/com.android.runtime/lib64/bionic/libdl.so");
             #endif
         }
-
         //get mmap，dlopen，dlsym，dlclose proc's address
         ret = -1;
         g_current_libc_base = get_module_base(getpid(), g_libc_path);
@@ -78,17 +77,15 @@ int ptrace_init(pid_t remote_pid)
             ret = 0;
         }
     }
-    
     return ret;
 }
 
-
 //read remote process's data of size
-int ptrace_readdata(pid_t pid, uint8_t *dest, uint8_t *source, size_t size)
+long ptrace_readdata(pid_t pid, uint8_t *dest, uint8_t *source, size_t size)
 {
     if(0 == pid || NULL == source || NULL == dest)  return -1;
 
-    int ret = 0;
+    long ret = 0;
     int word = __WORDSIZE / 8;
     for(int i = 0; i < size / word; i++){
         if(ptrace(PTRACE_PEEKDATA, pid, source + i * word, dest + i * word))    return -1;
@@ -97,13 +94,12 @@ int ptrace_readdata(pid_t pid, uint8_t *dest, uint8_t *source, size_t size)
     return ret;
 }
 
-
 //write remote process's data of size
-int ptrace_writedata(pid_t pid, uint8_t *dest, uint8_t *source, size_t size)
+long ptrace_writedata(pid_t pid, uint8_t *dest, uint8_t *source, size_t size)
 {
     if(0 == pid || NULL == source || NULL == dest)  return -1;
 
-    int ret = 0;
+    long ret = 0;
     int word = __WORDSIZE / 8;
     for(int i = 0; i < size / word; i++){
         if(ptrace(PTRACE_POKEDATA, pid, dest + i * word, *(u_long*)(source + i * word)))    return -1;
@@ -111,7 +107,6 @@ int ptrace_writedata(pid_t pid, uint8_t *dest, uint8_t *source, size_t size)
     ret = ptrace(PTRACE_POKEDATA, pid, dest + size - word, *(u_long*)(source + size - word));
     return ret;
 }
-
 
 //remote call pid's proc
 #ifdef  __arm__
@@ -168,18 +163,74 @@ int ptrace_call(pid_t pid, void *remote_proc, const u_long *parameters, int para
 
 }
 #elif   __aarch64__
-int ptrace_call(pid_t pid, void *remote_proc )
+int ptrace_call(pid_t pid, void *remote_proc, const u_long *parameters, int param_num, struct user_pt_regs* regs, u_long* remote_proc_ret)
 {
+    if(0 == pid || NULL == remote_proc  || NULL == regs || NULL == remote_proc_ret) return -1;
 
-
+    int ret = 0;
+    if(param_num <= 8){
+        for(int i = 0; i < param_num; i++){
+            regs->regs[i] = parameters[i];
+        }
+    }
+    else if(param_num > 8){
+        for(int i = 0; i < 8; i++){
+            regs->regs[i] = parameters[i];
+        }
+        for(int i = 1; i <= param_num - 8; i++){
+            ret = ptrace(PTRACE_POKEDATA, pid, regs->sp - 8 * i, NULL);
+            if(ret)    break;
+            regs->sp = regs->sp - 8;      //sp
+        }
+    }
+    if(!ret){
+        regs->pc = remote_proc;  //pc
+        regs->regs[30] = 0;      //lr
+        if(regs->pc & 1){
+            //thumb
+            regs->pc &= (~1u);
+            regs->pstate |= CPSR_T_MASK;
+        }
+        else{
+            //arm
+            regs->pstate &= (~CPSR_T_MASK);
+        }
+        //set regs
+        ret = ptrace(PTRACE_SETREGSET, pid, NULL, regs);
+        if(!ret){
+            ret = ptrace(PTRACE_CONT, pid, NULL, NULL);
+            if(!ret){
+                int status = 0;
+                waitpid(pid, &status, WUNTRACED);
+                if(0xb7f == status){
+                    //get remote proc return
+                    ret = ptrace(PTRACE_GETREGSET, pid, NULL, regs);
+                    *remote_proc_ret = regs->regs[0];
+                }
+            }
+        }
+    }
+    return ret;
 }
 #endif
+
 
 //injection remote process
 int inject_remote_process(pid_t pid, const char *lib_path, void * remote_module_base)
 {
     if(0 == pid || NULL == lib_path || NULL == remote_module_base)    return -1;
 
+    #ifdef  __arm__
+    struct pt_regs old_regs = {0};
+    struct pt_regs new_regs = old_regs;
+    u_long PT_GETREGS = PTRACE_GETREGS;
+    u_long PT_SETREGS = PTRACE_SETREGS;
+    #elif   __aarch64__
+    struct user_pt_regs old_regs = {0};
+    struct user_pt_regs new_regs = old_regs;
+    u_long PT_GETREGS = PTRACE_GETREGSET;
+    u_long PT_SETREGS = PTRACE_SETREGSET;
+    #endif
     //init
     if(ptrace_init(pid)){
         return -1;
@@ -190,13 +241,11 @@ int inject_remote_process(pid_t pid, const char *lib_path, void * remote_module_
     }
     waitpid(pid, NULL, WUNTRACED);
     //get registers
-    struct pt_regs old_regs = {0};
-    if(ptrace(PTRACE_GETREGS, pid, NULL, &old_regs)){
+    if(ptrace(PT_GETREGS, pid, NULL, &old_regs)){
         return -1;
     }
     //remote call mmap
     u_long remote_map_addr = 0;
-    struct pt_regs new_regs = old_regs;
     u_long  parameters[6] = {0};
     parameters[0] = NULL;           //addr
     parameters[1] = 0x1000;         //size
@@ -230,7 +279,7 @@ int inject_remote_process(pid_t pid, const char *lib_path, void * remote_module_
         return -1;
     }
     //set regs
-    if(ptrace(PTRACE_SETREGS, pid, NULL, &old_regs)){
+    if(ptrace(PT_SETREGS, pid, NULL, &old_regs)){
         return -1;
     }
     //detach remote process
@@ -254,6 +303,17 @@ int call_remote_module_func(
 {
     if(0 == pid || NULL == remote_module_base || NULL == remote_module_func || param_num > MAX_PARAMENUM)    return -1;
 
+    #ifdef  __arm__
+    struct pt_regs old_regs = {0};
+    struct pt_regs new_regs = old_regs;
+    u_long PT_GETREGS = PTRACE_GETREGS;
+    u_long PT_SETREGS = PTRACE_SETREGS;
+    #elif   __aarch64__
+    struct user_pt_regs old_regs = {0};
+    struct user_pt_regs new_regs = old_regs;
+    u_long PT_GETREGS = PTRACE_GETREGSET;
+    u_long PT_SETREGS = PTRACE_SETREGSET;
+    #endif
     //init
     if(ptrace_init(pid)){
         return -1;
@@ -264,13 +324,11 @@ int call_remote_module_func(
     }
     waitpid(pid, NULL, WUNTRACED);
     //get registers
-    struct pt_regs old_regs = {0};
-    if(ptrace(PTRACE_GETREGS, pid, NULL, &old_regs)){
+    if(ptrace(PT_GETREGS, pid, NULL, &old_regs)){
         return -1;
     }
     //remote call mmap
     u_long remote_map_addr = 0;
-    struct pt_regs new_regs = old_regs;
     u_long  parameters[MAX_PARAMENUM] = {0};
     parameters[0] = NULL;           //addr
     parameters[1] = 0x1000;         //size
@@ -312,7 +370,7 @@ int call_remote_module_func(
         return -1;
     }
     //set regs
-    if(ptrace(PTRACE_SETREGS, pid, NULL, &old_regs)){
+    if(ptrace(PT_SETREGS, pid, NULL, &old_regs)){
         return -1;
     }
     //detach remote process
