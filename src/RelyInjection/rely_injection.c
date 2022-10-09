@@ -13,16 +13,16 @@ size_t get_new_file_size(
     const char *lib_path, 
     u_long align_size, 
     u_long *p_new_load_program_off, 
-    u_long *p_new_load_program_size,
+    u_int32_t *p_new_load_program_size,
     u_long *p_new_dynamic_off,
-    u_long *p_new_dynamic_size,
+    u_int32_t *p_new_dynamic_size,
     u_long *p_new_dynstr_off,
-    u_long *p_new_dynstr_size,
+    u_int32_t *p_new_dynstr_size,
     u_long *p_new_interp_off,
-    u_long *p_new_interp_size,
+    u_int32_t *p_new_interp_size,
     u_long *p_new_note_off,
-    u_long *p_new_note_size,
-    u_long *p_new_program_header_table_size)
+    u_int32_t *p_new_note_size,
+    u_int32_t *p_new_program_header_table_size)
 {   
     if(
         NULL == fd || 
