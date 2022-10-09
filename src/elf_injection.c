@@ -41,6 +41,22 @@ int main(int argc, char *argv[], char *envp[])
         char source_lib_path[PATH_MAX] = {0};
         strcpy(dest_lib_path, argv[2]);
         strcpy(source_lib_path, argv[3]);
+        int bit = judge_elf_bit(dest_lib_path);
+        if(-1 == bit || 0 == bit){
+            printf("dest file is vaild!\n");
+            return 0;
+        }
+        #ifdef  __arm__
+        if(bit = 2){
+            printf("dest file is 64 bit, please use 64 bit ELFinjection\n");
+            return 0;
+        }
+        #elif   __aarch64__
+        if(bit = 1){
+            printf("dest file is 32 bit, please use 32 bit ELFinjection\n");
+            return 0;
+        }
+        #endif
         if(add_rely_lib(dest_lib_path, source_lib_path)){
             printf("add rely lib is error!\n");
             return 0;

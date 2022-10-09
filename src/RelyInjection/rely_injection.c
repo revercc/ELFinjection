@@ -503,3 +503,34 @@ int add_rely_lib(const char *dest_lib_path, const char *source_lib_path)
     fclose(fd);
     return ret;
 }
+//git dest_file bit
+int judge_elf_bit(const char *dest_lib_path)
+{
+    if(NULL == dest_lib_path)    return -1;
+
+    int ret = -1;
+    FILE *fd = fopen(dest_lib_path, "r+");
+    if(!fd){
+        return ret;
+    }
+    size_t file_size = 0;
+    fseek(fd, 0, SEEK_END);
+    file_size = ftell(fd);
+    fseek(fd, 0, SEEK_SET);
+    uint8_t *file_buffer = (uint8_t *)malloc(file_size);
+    if(file_buffer){
+        memset(file_buffer, 0, file_size);
+        fseek(fd, 0, SEEK_SET);
+        if(1 == fread(file_buffer, file_size, 1, fd)){
+            #ifdef  __arm__
+            Elf64_Ehdr* elf_header = (Elf64_Ehdr *)file_buffer;
+            #elif   __aarch64__
+            Elf64_Ehdr* elf_header = (Elf64_Ehdr *)file_buffer;
+            #endif
+            ret = elf_header->e_ident[4];
+        }
+        free(file_buffer);
+    }    
+    fclose(fd);
+    return ret;
+}
