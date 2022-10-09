@@ -22,9 +22,9 @@
 
             "cwd": "${workspaceRoot}",
 
-            "program": "${workspaceRoot}/obj/local/armeabi-v7a/ELFinjection",           //目标调试程序（带符号）
+            "program": "${workspaceRoot}/obj/local/arm64-v8a/ELFinjection",           //目标调试程序（带符号）
 
-            "additionalSOLibSearchPath": "${workspaceRoot}/bin/armeabi-v7a",  //目标调试库（带符号）
+            "additionalSOLibSearchPath": "${workspaceRoot}/bin/arm64-v8a",  //目标调试库（带符号）
 
             "miDebuggerServerAddress": "localhost:5050",             //设置本地通信端口
 
@@ -42,7 +42,7 @@
 
                 {
 
-                    "text": "set sysroot ${workspaceRoot}/bin/armeabi-v7a",
+                    "text": "set sysroot ${workspaceRoot}/bin/arm64-v8a",
 
                     "description": "set sysroot path"
 
@@ -50,13 +50,10 @@
 
             ],
 
-            "windows": {
+            "miDebuggerPath": "${env:ANDROID_NDK}/prebuilt/windows-x86_64/bin/gdb.exe", //本机GDB位置
 
-                "miDebuggerPath": "${env:ANDROID_NDK}/prebuilt/windows-x86_64/bin/gdb.exe", //本机GDB位置
+            "MIMode": "gdb"
 
-                "MIMode": "gdb"
-
-            }
 
         }
 
