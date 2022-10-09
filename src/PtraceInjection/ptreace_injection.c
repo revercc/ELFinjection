@@ -158,7 +158,6 @@ int ptrace_call(pid_t pid, void *remote_proc, const u_long *parameters, int para
         }
     }
     return ret;
-
 }
 #elif   __aarch64__
 int ptrace_call(pid_t pid, void *remote_proc, const u_long *parameters, int param_num, struct user_pt_regs* regs, u_long* remote_proc_ret)
