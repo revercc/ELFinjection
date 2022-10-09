@@ -130,7 +130,6 @@ int ptrace_call(pid_t pid, void *remote_proc, const u_long *parameters, int para
             regs->uregs[13] = regs->uregs[13] - 4;      //sp
         }
     }
-
     if(!ret){
         regs->uregs[15] = remote_proc;  //pc
         regs->uregs[14] = 0;            //lr
@@ -157,7 +156,6 @@ int ptrace_call(pid_t pid, void *remote_proc, const u_long *parameters, int para
                 }
             }
         }
-
     }
     return ret;
 
