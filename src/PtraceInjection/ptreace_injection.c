@@ -6,9 +6,11 @@
 #include <string.h>
 #include <error.h>
 #include <unistd.h>
+#include <elf.h>
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
+#include <sys/uio.h>
 #include <sys/system_properties.h>
 
 //get module base address
@@ -107,7 +109,6 @@ long ptrace_writedata(pid_t pid, uint8_t *dest, uint8_t *source, size_t size)
     ret = ptrace(PTRACE_POKEDATA, pid, dest + size - word, *(u_long*)(source + size - word));
     return ret;
 }
-
 //remote call pid's proc
 #ifdef  __arm__
 int ptrace_call(pid_t pid, void *remote_proc, const u_long *parameters, int param_num, struct pt_regs* regs, u_long* remote_proc_ret)
@@ -193,7 +194,11 @@ int ptrace_call(pid_t pid, void *remote_proc, const u_long *parameters, int para
             regs->pstate &= (~CPSR_T_MASK);
         }
         //set regs
-        ret = ptrace(PTRACE_SETREGSET, pid, NULL, regs);
+        struct iovec ioVec;
+        ioVec.iov_base = regs;
+        ioVec.iov_len = sizeof(*regs);
+        int regset = NT_PRSTATUS;
+        ret = ptrace(PTRACE_SETREGSET, pid, (void*)regset, &ioVec);
         if(!ret){
             ret = ptrace(PTRACE_CONT, pid, NULL, NULL);
             if(!ret){
@@ -201,7 +206,7 @@ int ptrace_call(pid_t pid, void *remote_proc, const u_long *parameters, int para
                 waitpid(pid, &status, WUNTRACED);
                 if(0xb7f == status){
                     //get remote proc return
-                    ret = ptrace(PTRACE_GETREGSET, pid, NULL, regs);
+                    ret = ptrace(PTRACE_GETREGSET, pid, (void*)regset, &ioVec);
                     *remote_proc_ret = regs->regs[0];
                 }
             }
@@ -236,11 +241,22 @@ int inject_remote_process(pid_t pid, const char *lib_path, void * remote_module_
     if(ptrace(PTRACE_ATTACH, pid, NULL, NULL)){
         return -1;
     }
+
     waitpid(pid, NULL, WUNTRACED);
     //get registers
+    #ifdef  __arm__
     if(ptrace(PT_GETREGS, pid, NULL, &old_regs)){
         return -1;
     }
+    #elif   __aarch64__
+    struct iovec ioVec;
+    ioVec.iov_base = &old_regs;
+    ioVec.iov_len = sizeof(old_regs);
+    int regset = NT_PRSTATUS;
+    if(ptrace(PT_GETREGS, pid, (void*)regset, &ioVec)){
+        return -1;
+    }
+    #endif
     new_regs = old_regs;
     //remote call mmap
     u_long remote_map_addr = 0;
@@ -277,9 +293,17 @@ int inject_remote_process(pid_t pid, const char *lib_path, void * remote_module_
         return -1;
     }
     //set regs
+    #ifdef  __arm__
     if(ptrace(PT_SETREGS, pid, NULL, &old_regs)){
         return -1;
     }
+    #elif   __aarch64__
+    ioVec.iov_base = &old_regs;
+    ioVec.iov_len = sizeof(old_regs);
+    if(ptrace(PT_SETREGS, pid, (void*)regset, &ioVec)){
+        return -1;
+    }
+    #endif
     //detach remote process
     if(ptrace(PTRACE_DETACH, pid, NULL, NULL)){
         return -1;
@@ -322,9 +346,19 @@ int call_remote_module_func(
     }
     waitpid(pid, NULL, WUNTRACED);
     //get registers
+    #ifdef  __arm__
     if(ptrace(PT_GETREGS, pid, NULL, &old_regs)){
         return -1;
     }
+    #elif   __aarch64__
+    struct iovec ioVec;
+    ioVec.iov_base = &old_regs;
+    ioVec.iov_len = sizeof(old_regs);
+    int regset = NT_PRSTATUS;
+    if(ptrace(PT_GETREGS, pid, (void*)regset, &ioVec)){
+        return -1;
+    }
+    #endif
     new_regs = old_regs;
     //remote call mmap
     u_long remote_map_addr = 0;
@@ -369,9 +403,17 @@ int call_remote_module_func(
         return -1;
     }
     //set regs
+    #ifdef  __arm__
     if(ptrace(PT_SETREGS, pid, NULL, &old_regs)){
         return -1;
     }
+    #elif   __aarch64__
+    ioVec.iov_base = &old_regs;
+    ioVec.iov_len = sizeof(old_regs);
+    if(ptrace(PT_SETREGS, pid, (void*)regset, &ioVec)){
+        return -1;
+    }
+    #endif
     //detach remote process
     if(ptrace(PTRACE_DETACH, pid, NULL, NULL)){
         return -1;
