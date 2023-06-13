@@ -47,12 +47,12 @@ int main(int argc, char *argv[], char *envp[])
             return 0;
         }
         #ifdef  __arm__
-        if(bit = 2){
+        if(bit == 2){
             printf("dest file is 64 bit, please use 64 bit ELFinjection\n");
             return 0;
         }
         #elif   __aarch64__
-        if(bit = 1){
+        if(bit == 1){
             printf("dest file is 32 bit, please use 32 bit ELFinjection\n");
             return 0;
         }
